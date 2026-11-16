@@ -61,128 +61,21 @@ fun ZeniApp(vm: ChatViewModel) {
 
 @Composable
 fun SetupScreen(vm: ChatViewModel) {
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) vm.importModel(uri)
-    }
-    var url by remember { mutableStateOf("") }
-    var serverUrl by remember { mutableStateOf(vm.backendUrl) }
-    val busy = vm.modelState == ModelState.Busy || vm.modelState == ModelState.Loading
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
-    ) {
+    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Logo(140.dp)
         Spacer(Modifier.height(16.dp))
         Text("Zeni IA", fontSize = 30.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Elige cómo quieres usar Zeni: con IA online o con un modelo guardado en tu teléfono.",
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Spacer(Modifier.height(10.dp))
+        Text("Tu asistente funcionará por internet. Ya no usaremos modelos descargados en el teléfono.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(28.dp))
-
-        if (busy) {
-            Text(vm.status, color = VioletLight)
-            Spacer(Modifier.height(12.dp))
-            if (vm.modelState == ModelState.Busy && vm.progress > 0f) {
-                LinearProgressIndicator(
-                    progress = { vm.progress },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Violet
-                )
-                Text("${(vm.progress * 100).toInt()}%", Modifier.padding(top = 6.dp), fontSize = 12.sp)
-            } else {
-                LinearProgressIndicator(Modifier.fillMaxWidth(), color = Violet)
+        Surface(color = Panel, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(Icons.Default.Cloud, null, tint = VioletLight, modifier = Modifier.size(34.dp))
+                Spacer(Modifier.height(10.dp))
+                Text("Servidor Zeni en preparación", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                Spacer(Modifier.height(6.dp))
+                Text("Primero conectaremos el servidor seguro. Después activaremos el inicio de sesión con Google.", textAlign = TextAlign.Center, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-        } else {
-            Text(
-                "Conexión online de Zeni",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Pega aquí la dirección HTTPS del servidor. No pongas una clave de Gemini en la aplicación.",
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = serverUrl,
-                onValueChange = { serverUrl = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("Dirección del servidor Zeni") },
-                placeholder = { Text("https://tu-servidor.example") },
-                shape = RoundedCornerShape(16.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = { vm.enableOnline(serverUrl) },
-                enabled = serverUrl.startsWith("https://"),
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Violet)
-            ) {
-                Text("Conectar con Zeni online")
-            }
-            Spacer(Modifier.height(24.dp))
-            HorizontalDivider(color = Bubble)
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "O usa un modelo local sin internet",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                "Necesitas un modelo de IA en formato .task. Se guarda en el teléfono.",
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = { picker.launch(arrayOf("*/*")) },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Violet)
-            ) {
-                Icon(Icons.Default.FolderOpen, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Elegir modelo del teléfono")
-            }
-            Spacer(Modifier.height(14.dp))
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("o pega un enlace de descarga") },
-                shape = RoundedCornerShape(16.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { vm.downloadModel(url) },
-                enabled = url.startsWith("http"),
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Default.Download, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Descargar una sola vez")
-            }
-        }
-
-        vm.error?.let {
-            Spacer(Modifier.height(16.dp))
-            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, textAlign = TextAlign.Center)
         }
     }
 }
@@ -251,11 +144,7 @@ fun ChatRoot(vm: ChatViewModel) {
                                 text = { Text("Configurar Zeni online") },
                                 onClick = { menu = false; vm.openSetup() }
                             )
-                            DropdownMenuItem(
-                                text = { Text("Cambiar modelo local") },
-                                onClick = { menu = false; vm.removeModel() }
-                            )
-                        }
+}
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -286,7 +175,7 @@ fun MessagesList(vm: ChatViewModel, modifier: Modifier) {
             Text("¿En qué te ayudo hoy?", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
-                if (vm.onlineMode) "Conectada a Zeni online" else "Sin internet · modelo local",
+                "Conectada a Zeni online",
                 color = VioletLight,
                 fontSize = 13.sp
             )
