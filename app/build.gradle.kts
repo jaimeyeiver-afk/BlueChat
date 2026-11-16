@@ -44,6 +44,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    // MediaPipe 0.10.26.1 añade soporte para procesadores ARM de 32 bits.
-    implementation("com.google.mediapipe:tasks-genai:0.10.26.1")
+    // MediaPipe 0.10.27 incluye los cambios posteriores de compatibilidad ARMv7.
+    implementation("com.google.mediapipe:tasks-genai:0.10.27")
 }
