@@ -16,7 +16,7 @@ class GeminiEngine(private val context: Context) {
 
     companion object {
         /** Modelo de Gemini. Si Google lo retira, solo hay que cambiar este nombre. */
-        const val MODEL_NAME = "gemini-3.5-flash"
+        const val MODEL_NAME = "gemini-3.8-flash"
 
         private const val SYSTEM_PROMPT =
             "Eres Zeni IA, un asistente amable, claro y útil. Responde siempre en el mismo idioma del usuario."
