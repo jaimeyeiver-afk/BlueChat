@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
 enum class ModelState { None, Busy, Loading, Ready }
@@ -124,19 +124,33 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         generating = true
         val snapshot = messages.toList()
         viewModelScope.launch {
+            val updates = Channel<String>(Channel.CONFLATED)
+            var responseStarted = false
+            val renderer = launch {
+                for (partial in updates) {
+                    if (!responseStarted) {
+                        messages.add(Msg("assistant", partial))
+                        responseStarted = true
+                    } else if (messages.lastOrNull()?.role == "assistant") {
+                        messages[messages.lastIndex] = Msg("assistant", partial)
+                    }
+                }
+            }
             try {
-                val answer = engine.generate(snapshot).ifBlank { "…" }
-                // Efecto de escritura
-                messages.add(Msg("assistant", ""))
-                val idx = messages.lastIndex
-                var shown = 0
-                while (shown < answer.length) {
-                    shown = minOf(answer.length, shown + 3)
-                    messages[idx] = Msg("assistant", answer.substring(0, shown))
-                    delay(12)
+                val answer = engine.generate(snapshot) { partial ->
+                    updates.trySend(partial)
+                }.ifBlank { "…" }
+                updates.close()
+                renderer.join()
+                if (responseStarted && messages.lastOrNull()?.role == "assistant") {
+                    messages[messages.lastIndex] = Msg("assistant", answer)
+                } else {
+                    messages.add(Msg("assistant", answer))
                 }
             } catch (e: Throwable) {
-                messages.add(Msg("assistant", "⚠️ Error: ${e.message}"))
+                updates.close()
+                renderer.join()
+                messages.add(Msg("assistant", "⚠️ Error: ${e.cause?.message ?: e.message}"))
             } finally {
                 generating = false
                 persist()
