@@ -11,9 +11,10 @@ android {
         applicationId = "com.zeni.ia"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
-        ndk { abiFilters += listOf("arm64-v8a") }
+        versionCode = 2
+        versionName = "1.1-j4-test"
+        // El J4 Core usa Android de 32 bits: incluimos ARM de 32 y 64 bits.
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }
 
     buildTypes {
@@ -43,6 +44,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    // Motor de IA local (funciona sin internet)
-    implementation("com.google.mediapipe:tasks-genai:0.10.14")
+    // MediaPipe 0.10.26.1 añade soporte para procesadores ARM de 32 bits.
+    implementation("com.google.mediapipe:tasks-genai:0.10.26.1")
 }

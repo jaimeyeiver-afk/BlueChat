@@ -1,6 +1,8 @@
 name: Build Zeni IA APK (copia)
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,8 +23,8 @@ jobs:
       - name: Compilar APK
         run: gradle :app:assembleRelease --no-daemon
       - name: Renombrar APK
-        run: cp app/build/outputs/apk/release/app-release.apk ZeniIA.apk
+        run: cp app/build/outputs/apk/release/app-release.apk ZeniIA-J4-test.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: ZeniIA-apk-copia
-          path: ZeniIA.apk
+          name: ZeniIA-J4-test
+          path: ZeniIA-J4-test.apk
