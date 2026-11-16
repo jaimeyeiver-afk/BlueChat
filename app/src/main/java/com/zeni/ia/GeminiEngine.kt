@@ -38,7 +38,7 @@ class GeminiEngine(private val context: Context) {
     /** Devuelve la respuesta de Gemini en trozos de texto, a medida que llegan. */
     fun stream(history: List<Msg>): Flow<String> {
         val contents = toContents(history)
-        return model.generateContentStream(*contents.toTypedArray()).mapNotNull { it.text }
+        return model.generateContentStream(contents).mapNotNull { response -> response.text }
     }
 
     /**
