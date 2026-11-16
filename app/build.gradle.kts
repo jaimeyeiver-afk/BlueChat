@@ -16,9 +16,9 @@ android {
         applicationId = "com.zeni.ia"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "2.0-internet"
-        // Sin librerías nativas: todo es Java/Kotlin, así que corre igual en ARM de 32 bits (J4 Core) y de 64 bits.
+        versionCode = 4
+        versionName = "2.1-internet-appcheck"
+        // Sin librerías nativas: compatible con ARM de 32 y 64 bits.
     }
 
     buildTypes {
@@ -58,7 +58,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
-    // Firebase AI Logic con Gemini Developer API (la clave de Gemini la guarda Firebase, no la app).
+    // Firebase AI Logic y App Check: Play Integrity en release; proveedor debug solo en debug.
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-ai")
+    implementation("com.google.firebase:firebase-appcheck-playintegrity")
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
 }
