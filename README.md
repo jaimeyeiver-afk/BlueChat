@@ -1,16 +1,20 @@
-# Zeni IA
+# Zeni IA (copia 32 bits, con internet)
 
-Asistente de IA tipo ChatGPT que corre **100% en tu teléfono, sin internet**.
-Diseño oscuro morado, chats guardados en el dispositivo, privado.
+Asistente de IA tipo ChatGPT que usa **Gemini por internet** mediante **Firebase AI Logic** (Gemini Developer API).
+Diseño oscuro morado, chats guardados en el dispositivo. Sin servidor propio y sin claves dentro de la app.
 
 ## Cómo conseguir el APK
-1. Ve a la pestaña **Actions** → "Build Zeni IA APK" → último run → descarga `ZeniIA-apk`.
-2. O entra a **Releases** → `latest` → descarga `ZeniIA.apk`.
+1. Pestaña **Actions** → "Build Zeni IA APK (copia 32 bits, con internet)" → último run → descarga `ZeniIA-internet`.
 
-## Modelo de IA (solo la primera vez)
-La app necesita un modelo local en formato MediaPipe `.task` (por ejemplo Gemma 3 1B o Qwen 2.5 0.5B/1.5B en formato LiteRT / MediaPipe).
-Al abrir la app: **Elegir modelo del teléfono** (archivo ya descargado) o **pegar un enlace** y descargarlo una sola vez.
-Después todo funciona sin conexión.
+## Qué necesita funcionar
+- En la consola de Firebase (proyecto `zeni-ia`): **Build → AI Logic → Gemini Developer API** activada.
+- `app/google-services.json` del proyecto, con el paquete `com.zeni.ia`.
+- Internet en el teléfono y Google Play Services.
+
+## Si el chat da error
+- "Firebase AI Logic no está activado…" → activar AI Logic en la consola.
+- "El modelo no está disponible…" → cambiar `MODEL_NAME` en `GeminiEngine.kt`.
 
 ## Tecnología
-Kotlin · Jetpack Compose · MediaPipe LLM Inference (`tasks-genai`).
+Kotlin · Jetpack Compose · Firebase AI Logic (`firebase-ai`) · Gemini.
+Sin librerías nativas, así que funciona en ARM de 32 y de 64 bits (por ejemplo Galaxy J4 Core).

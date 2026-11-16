@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet solo se usa para descargar el modelo UNA vez (opcional). El chat funciona sin conexión. -->
+    <!-- Internet: el chat consulta a Gemini a través de Firebase AI Logic. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -9,12 +9,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:largeHeap="true"
         android:theme="@style/Theme.Zeni">
-
-        <uses-native-library android:name="libOpenCL.so" android:required="false" />
-        <uses-native-library android:name="libOpenCL-car.so" android:required="false" />
-        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
 
         <activity
             android:name=".MainActivity"

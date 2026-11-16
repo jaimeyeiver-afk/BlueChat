@@ -1,20 +1,24 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
+    // Lee app/google-services.json (proyecto Firebase "zeni-ia", paquete com.zeni.ia).
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.zeni.ia"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.zeni.ia"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1-j4-test"
-        // El J4 Core usa Android de 32 bits: incluimos ARM de 32 y 64 bits.
-        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
+        versionCode = 3
+        versionName = "2.0-internet"
+        // Sin librerías nativas: todo es Java/Kotlin, así que corre igual en ARM de 32 bits (J4 Core) y de 64 bits.
     }
 
     buildTypes {
@@ -27,23 +31,34 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
-    composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
-    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    packaging {
+        resources.excludes += listOf(
+            "/META-INF/{AL2.0,LGPL2.1}",
+            "META-INF/INDEX.LIST",
+            "META-INF/DEPENDENCIES",
+            "META-INF/io.netty.versions.properties"
+        )
+    }
+}
+
+kotlin {
+    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
+    val composeBom = platform("androidx.compose:compose-bom:2025.09.00")
     implementation(composeBom)
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.3")
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    // MediaPipe 0.10.27 incluye los cambios posteriores de compatibilidad ARMv7.
-    implementation("com.google.mediapipe:tasks-genai:0.10.27")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+
+    // Firebase AI Logic con Gemini Developer API (la clave de Gemini la guarda Firebase, no la app).
+    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
+    implementation("com.google.firebase:firebase-ai")
 }

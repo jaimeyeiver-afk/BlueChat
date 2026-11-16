@@ -2,9 +2,6 @@
 
 package com.zeni.ia.ui
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zeni.ia.ChatViewModel
-import com.zeni.ia.ModelState
 import com.zeni.ia.R
 import kotlinx.coroutines.launch
 
@@ -50,98 +46,7 @@ fun ZeniApp(vm: ChatViewModel) {
     ) {
         // Sin esto el texto salía negro sobre fondo negro (título "Zeni IA" invisible).
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
-            when (vm.modelState) {
-                ModelState.Ready -> ChatRoot(vm)
-                else -> SetupScreen(vm)
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------- Setup
-
-@Composable
-fun SetupScreen(vm: ChatViewModel) {
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) vm.importModel(uri)
-    }
-    var url by remember { mutableStateOf("") }
-    val busy = vm.modelState == ModelState.Busy || vm.modelState == ModelState.Loading
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Logo(140.dp)
-        Spacer(Modifier.height(16.dp))
-        Text("Zeni IA", fontSize = 30.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "Tu asistente de IA que funciona sin internet.\nTodo se procesa dentro de tu teléfono.",
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(28.dp))
-
-        if (busy) {
-            Text(vm.status, color = VioletLight)
-            Spacer(Modifier.height(12.dp))
-            if (vm.modelState == ModelState.Busy && vm.progress > 0f) {
-                LinearProgressIndicator(
-                    progress = { vm.progress },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Violet
-                )
-                Text("${(vm.progress * 100).toInt()}%", Modifier.padding(top = 6.dp), fontSize = 12.sp)
-            } else {
-                LinearProgressIndicator(Modifier.fillMaxWidth(), color = Violet)
-            }
-        } else {
-            Text(
-                "Primera vez: necesitas un modelo de IA (.task). Se guarda en el teléfono y después ya no usas internet.",
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = { picker.launch(arrayOf("*/*")) },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Violet)
-            ) {
-                Icon(Icons.Default.FolderOpen, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Elegir modelo del teléfono")
-            }
-            Spacer(Modifier.height(14.dp))
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                label = { Text("o pega un enlace de descarga") },
-                shape = RoundedCornerShape(16.dp)
-            )
-            Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = { vm.downloadModel(url) },
-                enabled = url.startsWith("http"),
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Default.Download, null)
-                Spacer(Modifier.width(8.dp))
-                Text("Descargar una sola vez")
-            }
-        }
-
-        vm.error?.let {
-            Spacer(Modifier.height(16.dp))
-            Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp, textAlign = TextAlign.Center)
+            ChatRoot(vm)
         }
     }
 }
@@ -153,7 +58,6 @@ fun SetupScreen(vm: ChatViewModel) {
 fun ChatRoot(vm: ChatViewModel) {
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var menu by remember { mutableStateOf(false) }
 
     ModalNavigationDrawer(
         drawerState = drawer,
@@ -203,15 +107,6 @@ fun ChatRoot(vm: ChatViewModel) {
                 },
                 actions = {
                     IconButton(onClick = { vm.newChat() }) { Icon(Icons.Default.Edit, "Nuevo chat") }
-                    Box {
-                        IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más") }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Cambiar modelo de IA") },
-                                onClick = { menu = false; vm.removeModel() }
-                            )
-                        }
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
@@ -241,7 +136,7 @@ fun MessagesList(vm: ChatViewModel, modifier: Modifier) {
             Text("¿En qué te ayudo hoy?", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Sin internet · 100% privado",
+                "Con internet · Gemini",
                 color = VioletLight,
                 fontSize = 13.sp
             )

@@ -1,91 +1,30 @@
 package com.zeni.ia
 
 import android.app.Application
-import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-
-enum class ModelState { None, Busy, Loading, Ready }
+import java.io.IOException
 
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(app)
-    private val engine = LlmEngine(app)
+    private val engine = GeminiEngine(app)
 
     val conversations = mutableStateListOf<Conv>()
     var currentId by mutableStateOf<Long?>(null)
         private set
     val messages = mutableStateListOf<Msg>()
 
-    var modelState by mutableStateOf(ModelState.None)
-        private set
-    var progress by mutableStateOf(0f)
-        private set
-    var status by mutableStateOf("")
-        private set
-    var error by mutableStateOf<String?>(null)
-        private set
     var generating by mutableStateOf(false)
         private set
 
     init {
         conversations.addAll(store.load())
-        if (engine.hasModel()) loadModel()
-    }
-
-    fun clearError() { error = null }
-
-    // ---------- Modelo ----------
-    fun importModel(uri: Uri) = runModelJob("Copiando modelo al teléfono…") {
-        engine.importModel(uri) { progress = it }
-    }
-
-    fun downloadModel(url: String) = runModelJob("Descargando modelo (solo esta vez)…") {
-        engine.downloadModel(url.trim()) { progress = it }
-    }
-
-    private fun runModelJob(label: String, block: suspend () -> Unit) {
-        modelState = ModelState.Busy
-        status = label
-        progress = 0f
-        error = null
-        viewModelScope.launch {
-            try {
-                block()
-                loadSuspend()
-            } catch (e: Throwable) {
-                error = e.message ?: "Error desconocido"
-                modelState = if (engine.hasModel()) ModelState.Loading else ModelState.None
-                if (engine.hasModel()) loadModel()
-            }
-        }
-    }
-
-    private fun loadModel() {
-        viewModelScope.launch { loadSuspend() }
-    }
-
-    private suspend fun loadSuspend() {
-        modelState = ModelState.Loading
-        status = "Cargando Zeni IA…"
-        try {
-            engine.load()
-            modelState = ModelState.Ready
-        } catch (e: Throwable) {
-            error = "No se pudo cargar el modelo: ${e.message}"
-            engine.deleteModel()
-            modelState = ModelState.None
-        }
-    }
-
-    fun removeModel() {
-        engine.deleteModel()
-        modelState = ModelState.None
     }
 
     // ---------- Conversaciones ----------
@@ -118,29 +57,52 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun send(text: String) {
         val t = text.trim()
-        if (t.isEmpty() || generating || modelState != ModelState.Ready) return
+        if (t.isEmpty() || generating) return
         messages.add(Msg("user", t))
         persist()
         generating = true
         val snapshot = messages.toList()
         viewModelScope.launch {
+            val answer = StringBuilder()
+            var index = -1
             try {
-                val answer = engine.generate(snapshot).ifBlank { "…" }
-                // Efecto de escritura
-                messages.add(Msg("assistant", ""))
-                val idx = messages.lastIndex
-                var shown = 0
-                while (shown < answer.length) {
-                    shown = minOf(answer.length, shown + 3)
-                    messages[idx] = Msg("assistant", answer.substring(0, shown))
-                    delay(12)
+                engine.stream(snapshot).collect { chunk ->
+                    answer.append(chunk)
+                    if (index < 0) {
+                        messages.add(Msg("assistant", answer.toString()))
+                        index = messages.lastIndex
+                    } else {
+                        messages[index] = Msg("assistant", answer.toString())
+                    }
                 }
+                if (index < 0) messages.add(Msg("assistant", "…"))
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
-                messages.add(Msg("assistant", "⚠️ Error: ${e.message}"))
+                messages.add(Msg("assistant", "⚠️ " + friendlyError(e)))
             } finally {
                 generating = false
                 persist()
             }
+        }
+    }
+
+    /** Convierte los errores técnicos en un aviso que se entienda. */
+    private fun friendlyError(e: Throwable): String {
+        val raw = e.message ?: e.javaClass.simpleName
+        val low = raw.lowercase()
+        return when {
+            e is IOException || "unable to resolve host" in low || "timeout" in low ->
+                "No hay conexión a internet. Revisa tu WiFi o datos y vuelve a intentar."
+            "google-services" in low || "firebase no está configurado" in low ->
+                "Falta configurar Firebase en la app (google-services.json)."
+            "not found" in low || "404" in low ->
+                "El modelo de IA (${GeminiEngine.MODEL_NAME}) no está disponible. Hay que cambiar el nombre del modelo en la app."
+            "quota" in low || "429" in low ->
+                "Se alcanzó el límite de uso de la IA. Espera un momento y vuelve a intentar."
+            "permission" in low || "403" in low || "not enabled" in low || "disabled" in low || "api key" in low ->
+                "Firebase AI Logic no está activado o la clave no tiene permiso. Actívalo en la consola de Firebase (AI Logic → Gemini Developer API)."
+            else -> "Error: $raw"
         }
     }
 }
