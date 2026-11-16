@@ -44,16 +44,27 @@ test("bearerToken lee solo el formato correcto", () => {
   assert.equal(bearerToken(undefined), null);
 });
 
-// ---- Servidor completo con Gemini simulada ----
-let app, base, geminiCalls;
-const fakeFetch = async (_url, options) => {
-  geminiCalls.push(options.headers["x-goog-api-key"]);
-  return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: "Hola desde la prueba" }] } }] }) };
+// ---- Servidor completo con OpenAI simulada: no usa red ni claves reales ----
+let app, base, openAICalls;
+const fakeFetch = async (url, options) => {
+  openAICalls.push({ url, headers: options.headers, body: JSON.parse(options.body) });
+  return {
+    ok: true,
+    json: async () => ({
+      output: [{ type: "message", content: [{ type: "output_text", text: "Hola desde la prueba" }] }]
+    })
+  };
 };
 
 before(async () => {
-  geminiCalls = [];
-  app = createZeniServer({ apiKey: "clave-falsa", projectId: PROJECT, verifyToken: verifier(), fetchImpl: fakeFetch });
+  openAICalls = [];
+  app = createZeniServer({
+    apiKey: "clave-falsa",
+    model: "gpt-6-astra",
+    projectId: PROJECT,
+    verifyToken: verifier(),
+    fetchImpl: fakeFetch
+  });
   await new Promise((resolve) => app.listen(0, "127.0.0.1", resolve));
   base = `http://127.0.0.1:${app.address().port}`;
 });
@@ -66,20 +77,27 @@ const chat = (headers = {}) => fetch(`${base}/chat`, {
 });
 
 test("/health es público", async () => {
-  assert.equal((await fetch(`${base}/health`)).status, 200);
+  const res = await fetch(`${base}/health`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, service: "zeni-ia-openai-api" });
 });
 
-test("/chat sin sesión → 401 y no llama a Gemini", async () => {
+test("/chat sin sesión → 401 y no llama a OpenAI", async () => {
   assert.equal((await chat()).status, 401);
   assert.equal((await chat({ authorization: "Bearer token-falso" })).status, 401);
-  assert.equal(geminiCalls.length, 0);
+  assert.equal(openAICalls.length, 0);
 });
 
-test("/chat con sesión válida → 200 con respuesta", async () => {
+test("/chat con sesión válida → 200 y envía la petición correcta a OpenAI", async () => {
   const res = await chat({ authorization: `Bearer ${await sign()}` });
   assert.equal(res.status, 200);
-  assert.equal((await res.json()).answer, "Hola desde la prueba");
-  assert.equal(geminiCalls.length, 1);
+  assert.deepEqual(await res.json(), { answer: "Hola desde la prueba" });
+  assert.equal(openAICalls.length, 1);
+  assert.equal(openAICalls[0].url, "https://api.openai.com/v1/responses");
+  assert.equal(openAICalls[0].headers.authorization, "Bearer clave-falsa");
+  assert.equal(openAICalls[0].body.model, "gpt-6-astra");
+  assert.deepEqual(openAICalls[0].body.tools, [{ type: "web_search" }]);
+  assert.deepEqual(openAICalls[0].body.input, [{ role: "user", content: "Hola" }]);
 });
 
 test("sin FIREBASE_PROJECT_ID el servidor no queda abierto → 503", async () => {
