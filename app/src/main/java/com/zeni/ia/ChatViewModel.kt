@@ -43,11 +43,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     val canChat: Boolean
-        get() = if (onlineMode) backendUrl.startsWith("https://") else modelState == ModelState.Ready
+        get() = onlineMode && backendUrl.startsWith("https://")
 
     init {
         conversations.addAll(store.load())
-        if (!onlineMode && engine.hasModel()) loadModel()
     }
 
     fun clearError() { error = null }
@@ -180,11 +179,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             try {
-                val answer = (if (useOnline) {
-                    OnlineClient.generate(server, snapshot)
-                } else {
-                    engine.generate(snapshot) { partial -> updates.trySend(partial) }
-                }).ifBlank { "…" }
+                val answer = OnlineClient.generate(server, snapshot).ifBlank { "…" }
                 updates.close()
                 renderer.join()
                 if (responseStarted && messages.lastOrNull()?.role == "assistant") {
