@@ -13,6 +13,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // App Check debe inicializarse antes de crear o usar cualquier SDK de Firebase.
+        AppCheckInitializer.initialize(this)
+
         enableEdgeToEdge()
         setContent {
             ZeniTheme { ZeniApp(vm) }
