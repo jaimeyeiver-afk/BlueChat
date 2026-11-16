@@ -7,3 +7,6 @@ captures/
 *.apk
 *.task
 *.bin
+node_modules/
+.env
+app/google-services.json
