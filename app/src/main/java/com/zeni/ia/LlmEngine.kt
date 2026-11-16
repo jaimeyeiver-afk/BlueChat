@@ -14,6 +14,10 @@ class LlmEngine(private val context: Context) {
 
     private var llm: LlmInference? = null
     private val modelFile get() = File(context.filesDir, "model.task")
+    private val prefs = context.getSharedPreferences("zeni_model", Context.MODE_PRIVATE)
+    private var modelName: String
+        get() = prefs.getString("name", "") ?: ""
+        set(v) { prefs.edit().putString("name", v).apply() }
 
     fun hasModel(): Boolean = modelFile.exists() && modelFile.length() > 1_000_000
 
@@ -24,6 +28,11 @@ class LlmEngine(private val context: Context) {
         context.contentResolver.openInputStream(uri)!!.use { input ->
             tmp.outputStream().use { out -> copy(input, out, total, onProgress) }
         }
+        val shown = try {
+            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        } catch (e: Exception) { null }
+        modelName = shown ?: uri.lastPathSegment ?: ""
         finalize(tmp)
     }
 
@@ -38,6 +47,7 @@ class LlmEngine(private val context: Context) {
         conn.inputStream.use { input ->
             tmp.outputStream().use { out -> copy(input, out, conn.contentLengthLong, onProgress) }
         }
+        modelName = url.substringBefore('?').substringAfterLast('/')
         finalize(tmp)
     }
 
@@ -87,9 +97,8 @@ class LlmEngine(private val context: Context) {
         modelFile.delete()
     }
 
-    /** Formato de chat estilo Gemma (el más común para modelos .task). */
+    /** Cada familia de modelo usa un formato de chat distinto: Qwen = ChatML, el resto = Gemma. */
     private fun buildPrompt(history: List<Msg>): String {
-        val sb = StringBuilder()
         // Solo los últimos mensajes para no pasarse del contexto del modelo.
         var budget = 3000
         val picked = ArrayList<Msg>()
@@ -98,12 +107,22 @@ class LlmEngine(private val context: Context) {
             budget -= m.text.length
             picked.add(0, m)
         }
-        picked.forEach { m ->
-            val r = if (m.role == "user") "user" else "model"
-            sb.append("<start_of_turn>").append(r).append('\n')
-                .append(m.text).append("<end_of_turn>\n")
+        val sb = StringBuilder()
+        if (modelName.contains("qwen", ignoreCase = true)) {
+            sb.append("<|im_start|>system\nEres Zeni IA, un asistente amable y claro. Responde en el mismo idioma del usuario.<|im_end|>\n")
+            picked.forEach { m ->
+                val r = if (m.role == "user") "user" else "assistant"
+                sb.append("<|im_start|>").append(r).append('\n').append(m.text).append("<|im_end|>\n")
+            }
+            sb.append("<|im_start|>assistant\n")
+        } else {
+            picked.forEach { m ->
+                val r = if (m.role == "user") "user" else "model"
+                sb.append("<start_of_turn>").append(r).append('\n')
+                    .append(m.text).append("<end_of_turn>\n")
+            }
+            sb.append("<start_of_turn>model\n")
         }
-        sb.append("<start_of_turn>model\n")
         return sb.toString()
     }
 }
