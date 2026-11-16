@@ -87,10 +87,20 @@ class LlmEngine(private val context: Context) {
         llm = LlmInference.createFromOptions(context, options)
     }
 
-    suspend fun generate(history: List<Msg>): String = withContext(Dispatchers.Default) {
-        val engine = llm ?: error("El modelo no está cargado")
-        engine.generateResponse(buildPrompt(history)).trim()
-    }
+    /**
+     * Genera la respuesta en segundo plano y entrega texto parcial mientras el modelo trabaja.
+     * MediaPipe devuelve fragmentos; acumulamos el texto para que la interfaz pueda mostrarlo.
+     */
+    suspend fun generate(history: List<Msg>, onPartial: (String) -> Unit): String =
+        withContext(Dispatchers.IO) {
+            val engine = llm ?: error("El modelo no está cargado")
+            val accumulated = StringBuilder()
+            val future = engine.generateResponseAsync(buildPrompt(history)) { partial, _ ->
+                accumulated.append(partial)
+                onPartial(accumulated.toString())
+            }
+            future.get().trim()
+        }
 
     fun deleteModel() {
         llm?.close(); llm = null
