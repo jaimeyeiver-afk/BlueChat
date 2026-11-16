@@ -11,8 +11,8 @@ android {
         applicationId = "com.zeni.ia"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1-j4-test"
+        versionCode = 3
+        versionName = "1.2-online-test"
         // El J4 Core usa Android de 32 bits: incluimos ARM de 32 y 64 bits.
         ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }
