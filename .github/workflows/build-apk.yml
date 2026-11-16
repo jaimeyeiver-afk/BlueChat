@@ -20,10 +20,58 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.9
+
+      # Firebase: el archivo viene del secreto GOOGLE_SERVICES_JSON (Settings → Secrets and variables → Actions).
+      # Sin el secreto la APK compila igual, pero mostrará "Zeni todavía no está conectada".
+      - name: Preparar Firebase
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::Falta el secreto GOOGLE_SERVICES_JSON. La APK se compilará SIN inicio de sesión con Google."
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          python3 - <<'PY'
+          import json, sys
+          try:
+              data = json.load(open("app/google-services.json"))
+          except Exception:
+              print("::error::El secreto GOOGLE_SERVICES_JSON no es un JSON válido. Pega el contenido completo del archivo descargado de Firebase.")
+              sys.exit(1)
+          clients = data.get("client", [])
+          mine = [c for c in clients if c.get("client_info", {}).get("android_client_info", {}).get("package_name") == "com.zeni.ia"]
+          if not mine:
+              print("::error::google-services.json no contiene la app Android con nombre de paquete com.zeni.ia. Registra esa app en Firebase y vuelve a descargar el archivo.")
+              sys.exit(1)
+          if not any(o.get("client_type") == 3 for c in mine for o in c.get("oauth_client", [])):
+              print("::error::google-services.json no trae el cliente web de OAuth. Activa Google en Authentication → Método de acceso, registra el SHA-1 y vuelve a descargar el archivo.")
+              sys.exit(1)
+          print("Firebase: google-services.json válido para com.zeni.ia")
+          PY
+
       - name: Compilar APK
-        run: gradle :app:assembleRelease --no-daemon
+        env:
+          # Variable (no secreto) del repositorio: Settings → Secrets and variables → Actions → Variables.
+          ZENI_SERVER_URL: ${{ vars.ZENI_SERVER_URL }}
+        run: |
+          if [ -z "$ZENI_SERVER_URL" ]; then
+            echo "::warning::Falta la variable ZENI_SERVER_URL. La APK se compilará SIN dirección de servidor."
+          fi
+          gradle :app:assembleRelease --no-daemon
       - name: Renombrar APK
         run: cp app/build/outputs/apk/release/app-release.apk ZeniIA-J4-test.apk
+
+      - name: Huella SHA-1 para Firebase
+        run: |
+          {
+            echo "### Huella de firma de esta APK (para Firebase)"
+            echo "Registra el SHA-1 y el SHA-256 en Firebase Console → Configuración del proyecto → Tu app Android (com.zeni.ia)."
+            echo '```'
+            keytool -list -v -keystore app/zeni-test.keystore -storepass android -alias zenitest | grep -E "SHA1|SHA256"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v4
         with:
           name: ZeniIA-J4-test

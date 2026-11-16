@@ -2,6 +2,9 @@
 
 package com.zeni.ia.ui
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,13 +56,18 @@ fun ZeniApp(vm: ChatViewModel) {
     ) {
         // Sin esto el texto salía negro sobre fondo negro (título "Zeni IA" invisible).
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
-            if (vm.canChat && !vm.showSetup) ChatRoot(vm) else SetupScreen(vm)
+            when {
+                !vm.serverConfigured || !vm.firebaseConfigured -> SetupScreen(vm)
+                !vm.signedIn -> LoginScreen(vm)
+                else -> ChatRoot(vm)
+            }
         }
     }
 }
 
-// ---------------------------------------------------------------- Setup
+// ---------------------------------------------------------------- Setup / Login
 
+/** Se muestra solo si esta APK se compiló sin servidor o sin Firebase. El usuario no escribe nada aquí. */
 @Composable
 fun SetupScreen(vm: ChatViewModel) {
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -66,18 +75,68 @@ fun SetupScreen(vm: ChatViewModel) {
         Spacer(Modifier.height(16.dp))
         Text("Zeni IA", fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(10.dp))
-        Text("Tu asistente funcionará por internet. Ya no usaremos modelos descargados en el teléfono.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Tu asistente funciona por internet.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(28.dp))
         Surface(color = Panel, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Cloud, null, tint = VioletLight, modifier = Modifier.size(34.dp))
                 Spacer(Modifier.height(10.dp))
-                Text("Servidor Zeni en preparación", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                Text("Zeni todavía no está conectada", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
                 Spacer(Modifier.height(6.dp))
-                Text("Primero conectaremos el servidor seguro. Después activaremos el inicio de sesión con Google.", textAlign = TextAlign.Center, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val missing = buildList {
+                    if (!vm.serverConfigured) add("el servidor de Zeni")
+                    if (!vm.firebaseConfigured) add("el inicio de sesión con Google (Firebase)")
+                }.joinToString(" y ")
+                Text(
+                    "A esta versión de la app le falta configurar $missing. Pide una versión actualizada.",
+                    textAlign = TextAlign.Center,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
+}
+
+@Composable
+fun LoginScreen(vm: ChatViewModel) {
+    val activity = LocalContext.current.findActivity()
+    Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Logo(140.dp)
+        Spacer(Modifier.height(16.dp))
+        Text("Zeni IA", fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(10.dp))
+        Text("Inicia sesión para conversar con Zeni IA.", textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(28.dp))
+        Button(
+            onClick = { activity?.let { vm.signIn(it) } },
+            enabled = !vm.signingIn && activity != null,
+            colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Color.White),
+            shape = RoundedCornerShape(26.dp),
+            modifier = Modifier.fillMaxWidth().height(52.dp)
+        ) {
+            if (vm.signingIn) {
+                CircularProgressIndicator(Modifier.size(22.dp), color = Color.White, strokeWidth = 2.dp)
+            } else {
+                Icon(Icons.Default.AccountCircle, null)
+                Spacer(Modifier.width(10.dp))
+                Text("Continuar con Google", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        vm.error?.let { message ->
+            Spacer(Modifier.height(16.dp))
+            Text(message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, fontSize = 13.sp)
+        }
+    }
+}
+
+private fun Context.findActivity(): Activity? {
+    var current: Context = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
 }
 
 // ---------------------------------------------------------------- Chat
@@ -140,11 +199,14 @@ fun ChatRoot(vm: ChatViewModel) {
                     Box {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            vm.userLabel?.let { label ->
+                                DropdownMenuItem(text = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) }, enabled = false, onClick = {})
+                            }
                             DropdownMenuItem(
-                                text = { Text("Configurar Zeni online") },
-                                onClick = { menu = false; vm.openSetup() }
+                                text = { Text("Cerrar sesión") },
+                                onClick = { menu = false; vm.signOut() }
                             )
-}
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)

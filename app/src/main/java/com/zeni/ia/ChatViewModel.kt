@@ -1,7 +1,7 @@
 package com.zeni.ia
 
+import android.app.Activity
 import android.app.Application
-import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -17,7 +17,7 @@ enum class ModelState { None, Busy, Loading, Ready }
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(app)
     private val engine = LlmEngine(app)
-    private val settings = app.getSharedPreferences("zeni_settings", Context.MODE_PRIVATE)
+    private val auth = AuthManager(app)
 
     val conversations = mutableStateListOf<Conv>()
     var currentId by mutableStateOf<Long?>(null)
@@ -35,41 +35,69 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     var generating by mutableStateOf(false)
         private set
 
-    var onlineMode by mutableStateOf(settings.getBoolean("online_mode", false))
+    // ---------- Servidor y sesión ----------
+    /** Dirección del servidor, fijada al compilar la app (el usuario no escribe nada). */
+    private val serverUrl = BuildConfig.ZENI_SERVER_URL
+    val serverConfigured: Boolean = serverUrl.startsWith("https://") && serverUrl.length > 12
+    val firebaseConfigured: Boolean = auth.isConfigured
+
+    var signedIn by mutableStateOf(false)
         private set
-    var backendUrl by mutableStateOf(settings.getString("backend_url", "") ?: "")
+    var userLabel by mutableStateOf<String?>(null)
         private set
-    var showSetup by mutableStateOf(false)
+    var signingIn by mutableStateOf(false)
         private set
 
     val canChat: Boolean
-        get() = onlineMode && backendUrl.startsWith("https://")
+        get() = serverConfigured && firebaseConfigured && signedIn
+
+    private val stopObservingAuth: () -> Unit
 
     init {
         conversations.addAll(store.load())
+        stopObservingAuth = auth.observe { user ->
+            signedIn = user != null
+            userLabel = user?.email ?: user?.displayName
+        }
+        viewModelScope.launch { auth.resumePendingBrowserSignIn() }
+    }
+
+    override fun onCleared() {
+        stopObservingAuth()
     }
 
     fun clearError() { error = null }
 
-    fun openSetup() { showSetup = true }
-
-    fun enableOnline(url: String) {
-        val clean = url.trim().trimEnd('/')
-        if (!clean.startsWith("https://") || clean.length < 12) {
-            error = "Pega la dirección HTTPS de tu servidor Zeni."
-            return
-        }
-        backendUrl = clean
-        onlineMode = true
-        settings.edit().putString("backend_url", clean).putBoolean("online_mode", true).apply()
+    fun signIn(activity: Activity) {
+        if (signingIn) return
+        signingIn = true
         error = null
-        showSetup = false
+        viewModelScope.launch {
+            try {
+                auth.signIn(activity)
+            } catch (_: SignInCancelled) {
+                // El usuario cerró el selector de cuentas; no es un error.
+            } catch (e: Throwable) {
+                error = "No se pudo iniciar sesión: ${e.message ?: "error desconocido"}"
+            } finally {
+                signingIn = false
+            }
+        }
+    }
+
+    fun signOut() {
+        newChat()
+        viewModelScope.launch { auth.signOut() }
+    }
+
+    /** Pide el token de sesión y llama al servidor; si el servidor lo rechaza, renueva el token una vez. */
+    private suspend fun askServer(history: List<Msg>): String = try {
+        OnlineClient.generate(serverUrl, auth.idToken(), history)
+    } catch (_: SessionRejectedException) {
+        OnlineClient.generate(serverUrl, auth.idToken(forceRefresh = true), history)
     }
 
     fun useLocalMode() {
-        onlineMode = false
-        settings.edit().putBoolean("online_mode", false).apply()
-        showSetup = false
         if (modelState != ModelState.Ready && engine.hasModel()) loadModel()
     }
 
@@ -125,7 +153,6 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun removeModel() {
         engine.deleteModel()
         modelState = ModelState.None
-        showSetup = true
     }
 
     // ---------- Conversaciones ----------
@@ -163,8 +190,6 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         persist()
         generating = true
         val snapshot = messages.toList()
-        val useOnline = onlineMode
-        val server = backendUrl
         viewModelScope.launch {
             val updates = Channel<String>(Channel.CONFLATED)
             var responseStarted = false
@@ -179,7 +204,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             try {
-                val answer = OnlineClient.generate(server, snapshot).ifBlank { "…" }
+                val answer = askServer(snapshot).ifBlank { "…" }
                 updates.close()
                 renderer.join()
                 if (responseStarted && messages.lastOrNull()?.role == "assistant") {
