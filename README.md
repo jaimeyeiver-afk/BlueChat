@@ -4,21 +4,18 @@ Asistente de IA tipo ChatGPT con interfaz oscura morada y conversaciones guardad
 
 ## Estado del proyecto
 - La rama `fix/streaming-replies` conserva la versión anterior.
-- El trabajo de conexión online se desarrolla por separado en `zeni-online-gemini`.
-- El servidor seguro está en `server/`. Mantiene la clave de Gemini fuera de la APK y ofrece `POST /chat`, que ahora exige sesión de Firebase.
-- La app Android inicia sesión con Google (Firebase Authentication) y envía el token de sesión al servidor en cada mensaje.
-- La dirección del servidor se fija al compilar (`ZENI_SERVER_URL`); el usuario no escribe ninguna dirección.
-- Pendiente (requiere al propietario): crear el proyecto Firebase, publicar el servidor y cargar `GOOGLE_SERVICES_JSON` y `ZENI_SERVER_URL` en GitHub. Guía paso a paso: [docs/CONFIGURAR_FIREBASE_Y_SERVIDOR.md](docs/CONFIGURAR_FIREBASE_Y_SERVIDOR.md).
+- La rama `zeni-online-gemini` conserva el servidor anterior con Gemini.
+- La rama `zeni-openai-server` cambia el servidor online a OpenAI Responses API.
+- La app Android sigue usando Google/Firebase Authentication para iniciar sesión y envía un token al servidor en cada mensaje.
+- El servidor Node.js valida ese token y mantiene la clave OpenAI fuera del APK.
+- La app recibe la misma ruta `POST /chat`; no hace falta cambiar el contrato Android para sustituir el proveedor de IA.
+- La URL HTTPS del servidor se configura al compilar mediante `ZENI_SERVER_URL`.
 
-## Servidor online
-Consulta [server/README.md](server/README.md). La clave de Gemini debe configurarse como secreto en el hosting, nunca en un archivo de la app ni en GitHub. El servidor usa Google Search grounding para consultas que necesitan información actual.
+## Servidor OpenAI
+Consulta [server/README.md](server/README.md) y [docs/CONFIGURAR_OPENAI_Y_SERVIDOR.md](docs/CONFIGURAR_OPENAI_Y_SERVIDOR.md). La clave `OPENAI_API_KEY` debe existir solo como secreto del hosting, nunca en la APK ni en GitHub.
 
-## APK actual (modo local)
-1. Ve a **Actions** → "Build Zeni IA APK" → último run → descarga `ZeniIA-apk`.
-2. O entra a **Releases** → `latest` → descarga `ZeniIA.apk`.
-
-## Modelo local
-La app actual usa un modelo MediaPipe `.task`, que se guarda en el teléfono y permite conversar sin conexión.
+## APK
+El workflow Android existente puede compilar la aplicación cuando se configure la URL HTTPS del servidor y la configuración Firebase requerida para el inicio de sesión.
 
 ## Tecnología
-Kotlin · Jetpack Compose · MediaPipe LLM Inference · Node.js API para Gemini.
+Kotlin · Jetpack Compose · MediaPipe LLM Inference (modo local) · Node.js · OpenAI Responses API.
