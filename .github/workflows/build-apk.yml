@@ -31,10 +31,16 @@ jobs:
           else
             echo "Usando app/google-services.json del repositorio."
           fi
-      - name: Compilar APK
-        run: gradle :app:assembleRelease --no-daemon
-      - name: Renombrar APK
-        run: cp app/build/outputs/apk/release/app-release.apk ZeniIA-internet.apk
+      - name: Compilar APK de pruebas y APK release
+        run: gradle :app:assembleDebug :app:assembleRelease --no-daemon
+      - name: Preparar APKs
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk ZeniIA-internet-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk ZeniIA-internet.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ZeniIA-internet-debug
+          path: ZeniIA-internet-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: ZeniIA-internet
