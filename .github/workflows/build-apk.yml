@@ -2,7 +2,7 @@ name: Build Zeni IA APK (copia)
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/streaming-replies]
   workflow_dispatch:
 
 permissions:
