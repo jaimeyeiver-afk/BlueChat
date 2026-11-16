@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet solo se usa para descargar el modelo UNA vez (opcional). El chat funciona sin conexión. -->
+    <!-- Internet se necesita para conectar Zeni con su servidor online. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
