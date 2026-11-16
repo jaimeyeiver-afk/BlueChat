@@ -16,6 +16,7 @@ enum class ModelState { None, Busy, Loading, Ready }
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(app)
     private val engine = LlmEngine(app)
+    private val settings = app.getSharedPreferences("zeni_settings", Application.MODE_PRIVATE)
 
     val conversations = mutableStateListOf<Conv>()
     var currentId by mutableStateOf<Long?>(null)
@@ -33,6 +34,16 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     var generating by mutableStateOf(false)
         private set
 
+    var onlineMode by mutableStateOf(settings.getBoolean("online_mode", false))
+        private set
+    var backendUrl by mutableStateOf(settings.getString("backend_url", "") ?: "")
+        private set
+    var showSetup by mutableStateOf(false)
+        private set
+
+    val canChat: Boolean
+        get() = if (onlineMode) backendUrl.startsWith("https://") else modelState == ModelState.Ready
+
     init {
         conversations.addAll(store.load())
         if (engine.hasModel()) loadModel()
@@ -40,7 +51,29 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearError() { error = null }
 
-    // ---------- Modelo ----------
+    fun openSetup() { showSetup = true }
+
+    fun enableOnline(url: String) {
+        val clean = url.trim().trimEnd('/')
+        if (!clean.startsWith("https://") || clean.length < 12) {
+            error = "Pega la dirección HTTPS de tu servidor Zeni."
+            return
+        }
+        backendUrl = clean
+        onlineMode = true
+        settings.edit().putString("backend_url", clean).putBoolean("online_mode", true).apply()
+        error = null
+        showSetup = false
+    }
+
+    fun useLocalMode() {
+        onlineMode = false
+        settings.edit().putBoolean("online_mode", false).apply()
+        showSetup = false
+        if (modelState != ModelState.Ready && engine.hasModel()) loadModel()
+    }
+
+    // ---------- Modelo local ----------
     fun importModel(uri: Uri) = runModelJob("Copiando modelo al teléfono…") {
         engine.importModel(uri) { progress = it }
     }
@@ -86,6 +119,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun removeModel() {
         engine.deleteModel()
         modelState = ModelState.None
+        showSetup = true
     }
 
     // ---------- Conversaciones ----------
@@ -118,11 +152,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun send(text: String) {
         val t = text.trim()
-        if (t.isEmpty() || generating || modelState != ModelState.Ready) return
+        if (t.isEmpty() || generating || !canChat) return
         messages.add(Msg("user", t))
         persist()
         generating = true
         val snapshot = messages.toList()
+        val useOnline = onlineMode
+        val server = backendUrl
         viewModelScope.launch {
             val updates = Channel<String>(Channel.CONFLATED)
             var responseStarted = false
@@ -137,8 +173,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             try {
-                val answer = engine.generate(snapshot) { partial ->
-                    updates.trySend(partial)
+                val answer = if (useOnline) {
+                    OnlineClient.generate(server, snapshot)
+                } else {
+                    engine.generate(snapshot) { partial -> updates.trySend(partial) }
                 }.ifBlank { "…" }
                 updates.close()
                 renderer.join()
