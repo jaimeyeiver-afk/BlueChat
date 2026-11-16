@@ -50,10 +50,7 @@ fun ZeniApp(vm: ChatViewModel) {
     ) {
         // Sin esto el texto salía negro sobre fondo negro (título "Zeni IA" invisible).
         CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
-            when (vm.modelState) {
-                ModelState.Ready -> ChatRoot(vm)
-                else -> SetupScreen(vm)
-            }
+            if (vm.canChat && !vm.showSetup) ChatRoot(vm) else SetupScreen(vm)
         }
     }
 }
@@ -66,6 +63,7 @@ fun SetupScreen(vm: ChatViewModel) {
         if (uri != null) vm.importModel(uri)
     }
     var url by remember { mutableStateOf("") }
+    var serverUrl by remember { mutableStateOf(vm.backendUrl) }
     val busy = vm.modelState == ModelState.Busy || vm.modelState == ModelState.Loading
 
     Column(
@@ -101,12 +99,52 @@ fun SetupScreen(vm: ChatViewModel) {
             }
         } else {
             Text(
-                "Primera vez: necesitas un modelo de IA (.task). Se guarda en el teléfono y después ya no usas internet.",
+                "Conexión online de Zeni",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Pega aquí la dirección HTTPS del servidor. No pongas una clave de Gemini en la aplicación.",
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = serverUrl,
+                onValueChange = { serverUrl = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Dirección del servidor Zeni") },
+                placeholder = { Text("https://tu-servidor.example") },
+                shape = RoundedCornerShape(16.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = { vm.enableOnline(serverUrl) },
+                enabled = serverUrl.startsWith("https://"),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Violet)
+            ) {
+                Text("Conectar con Zeni online")
+            }
+            Spacer(Modifier.height(24.dp))
+            HorizontalDivider(color = Bubble)
             Spacer(Modifier.height(16.dp))
+            Text(
+                "O usa un modelo local sin internet",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "Necesitas un modelo de IA en formato .task. Se guarda en el teléfono.",
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
             Button(
                 onClick = { picker.launch(arrayOf("*/*")) },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -207,7 +245,11 @@ fun ChatRoot(vm: ChatViewModel) {
                         IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "Más") }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
-                                text = { Text("Cambiar modelo de IA") },
+                                text = { Text("Configurar Zeni online") },
+                                onClick = { menu = false; vm.openSetup() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Cambiar modelo local") },
                                 onClick = { menu = false; vm.removeModel() }
                             )
                         }
@@ -241,7 +283,7 @@ fun MessagesList(vm: ChatViewModel, modifier: Modifier) {
             Text("¿En qué te ayudo hoy?", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Sin internet · 100% privado",
+                if (vm.onlineMode) "Conectada a Zeni online" else "Sin internet · modelo local",
                 color = VioletLight,
                 fontSize = 13.sp
             )
