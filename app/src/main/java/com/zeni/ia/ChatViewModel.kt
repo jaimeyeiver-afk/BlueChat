@@ -47,7 +47,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         conversations.addAll(store.load())
-        if (engine.hasModel()) loadModel()
+        if (!onlineMode && engine.hasModel()) loadModel()
     }
 
     fun clearError() { error = null }
@@ -75,12 +75,18 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- Modelo local ----------
-    fun importModel(uri: Uri) = runModelJob("Copiando modelo al teléfono…") {
-        engine.importModel(uri) { progress = it }
+    fun importModel(uri: Uri) {
+        useLocalMode()
+        runModelJob("Copiando modelo al teléfono…") {
+            engine.importModel(uri) { progress = it }
+        }
     }
 
-    fun downloadModel(url: String) = runModelJob("Descargando modelo (solo esta vez)…") {
-        engine.downloadModel(url.trim()) { progress = it }
+    fun downloadModel(url: String) {
+        useLocalMode()
+        runModelJob("Descargando modelo (solo esta vez)…") {
+            engine.downloadModel(url.trim()) { progress = it }
+        }
     }
 
     private fun runModelJob(label: String, block: suspend () -> Unit) {
