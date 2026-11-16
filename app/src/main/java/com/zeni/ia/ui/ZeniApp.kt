@@ -48,9 +48,12 @@ fun ZeniApp(vm: ChatViewModel) {
             .systemBarsPadding()
             .imePadding()
     ) {
-        when (vm.modelState) {
-            ModelState.Ready -> ChatRoot(vm)
-            else -> SetupScreen(vm)
+        // Sin esto el texto salía negro sobre fondo negro (título "Zeni IA" invisible).
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+            when (vm.modelState) {
+                ModelState.Ready -> ChatRoot(vm)
+                else -> SetupScreen(vm)
+            }
         }
     }
 }
