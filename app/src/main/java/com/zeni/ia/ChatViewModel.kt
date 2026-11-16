@@ -1,6 +1,7 @@
 package com.zeni.ia
 
 import android.app.Application
+import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -16,7 +17,7 @@ enum class ModelState { None, Busy, Loading, Ready }
 class ChatViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(app)
     private val engine = LlmEngine(app)
-    private val settings = app.getSharedPreferences("zeni_settings", Application.MODE_PRIVATE)
+    private val settings = app.getSharedPreferences("zeni_settings", Context.MODE_PRIVATE)
 
     val conversations = mutableStateListOf<Conv>()
     var currentId by mutableStateOf<Long?>(null)
@@ -173,11 +174,11 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             try {
-                val answer = if (useOnline) {
+                val answer = (if (useOnline) {
                     OnlineClient.generate(server, snapshot)
                 } else {
                     engine.generate(snapshot) { partial -> updates.trySend(partial) }
-                }.ifBlank { "…" }
+                }).ifBlank { "…" }
                 updates.close()
                 renderer.join()
                 if (responseStarted && messages.lastOrNull()?.role == "assistant") {
